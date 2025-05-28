@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 // TypeScript interfaces matching Sheety API schema
 interface DomainInfo {
-  country_code: string; // "PL-EN", "ES-ES", etc.
+  country_code: string;
   total_keywords: number;
   total_keywords_brand: number;
   total_keywords_non_brand: number;
@@ -29,7 +29,7 @@ interface LongTailKeyword {
 }
 
 interface Competitor {
-  country_code: string; // e.g. "PL" or "ES"
+  country_code: string;
   domain: string;
   competitor_relevance: number;
   common_keywords: number;
@@ -65,7 +65,7 @@ const usePagination = <T,>(items: T[], initialSize = 10) => {
   return { slice, page, pages, total, setPage, setSize };
 };
 
-// Corrected PieChart component
+// PieChart component
 const PieChart = ({ data }: { data: KeywordTypeItem[] }) => {
   const total = data.reduce((s, x) => s + x.percent, 0);
   let acc = 0;
@@ -106,10 +106,9 @@ const SEODashboard: React.FC = () => {
   const [langNative, setLangNative] = useState(true);
   const [data, setData] = useState<SEOData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string| null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const cache = useCache<SEOData>();
-
   const tag = `${selectedCountry}-${langNative ? selectedCountry : 'EN'}`;
 
   const fetchData = useCallback(async () => {
@@ -120,11 +119,11 @@ const SEODashboard: React.FC = () => {
       if (cached) { setData(cached); return; }
 
       const [domRes, brandRes, nonBrandRes, longRes, compRes] = await Promise.all([
-        fetch('https://api.sheety.co/.../domainInfo').then(r=>r.json()),
-        fetch('https://api.sheety.co/.../keywordTypesBrand').then(r=>r.json()),
-        fetch('https://api.sheety.co/.../keywordTypesNonBrand').then(r=>r.json()),
-        fetch('https://api.sheety.co/.../longTailKeywords').then(r=>r.json()),
-        fetch('https://api.sheety.co/.../competitors').then(r=>r.json()),
+        fetch('https://api.sheety.co/.../domainInfo').then(r => r.json()),
+        fetch('https://api.sheety.co/.../keywordTypesBrand').then(r => r.json()),
+        fetch('https://api.sheety.co/.../keywordTypesNonBrand').then(r => r.json()),
+        fetch('https://api.sheety.co/.../longTailKeywords').then(r => r.json()),
+        fetch('https://api.sheety.co/.../competitors').then(r => r.json()),
       ]);
 
       const seo: SEOData = {
@@ -145,11 +144,11 @@ const SEODashboard: React.FC = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const overview = data?.domainInfo.find(d=>d.country_code===tag) ?? null;
-  const brandPie = data?.keywordTypesBrand.filter(k=>k.country_code===tag) ?? [];
-  const nonBrandPie = data?.keywordTypesNonBrand.filter(k=>k.country_code===tag) ?? [];
-  const longTail = data?.longTailKeywords.filter(l=>l.country_code===tag) ?? [];
-  const competitors = data?.competitors.filter(c=>c.country_code===selectedCountry) ?? [];
+  const overview = data?.domainInfo?.find(d => d.country_code === tag) ?? null;
+  const brandPie = data?.keywordTypesBrand?.filter(k => k.country_code === tag) ?? [];
+  const nonBrandPie = data?.keywordTypesNonBrand?.filter(k => k.country_code === tag) ?? [];
+  const longTail = data?.longTailKeywords?.filter(l => l.country_code === tag) ?? [];
+  const competitors = data?.competitors?.filter(c => c.country_code === selectedCountry) ?? [];
 
   const pagerLong = usePagination(longTail, 10);
   const pagerComp = usePagination(competitors, 5);
@@ -189,7 +188,6 @@ const SEODashboard: React.FC = () => {
 
       {/* Main Content */}
       <div className="container mx-auto p-4 space-y-8">
-        {/* Overview Cards */}
         {overview && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white rounded-lg shadow p-4">
@@ -207,7 +205,6 @@ const SEODashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Pie Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="bg-white rounded-lg shadow p-4">
             <h3 className="font-medium mb-4">Brand Keyword Types</h3>
@@ -219,7 +216,6 @@ const SEODashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Long-tail Keywords Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="p-4 border-b">
             <h3 className="font-medium">Long-tail Keyword Opportunities</h3>
@@ -244,28 +240,8 @@ const SEODashboard: React.FC = () => {
               ))}
             </tbody>
           </table>
-          <div className="p-4 border-t flex justify-between items-center">
-            <div>Showing {pagerLong.slice.length} of {pagerLong.total} keywords</div>
-            <div className="flex space-x-2">
-              <button 
-                onClick={() => pagerLong.setPage(pagerLong.page - 1)} 
-                disabled={pagerLong.page === 1}
-                className="px-3 py-1 border rounded disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <button 
-                onClick={() => pagerLong.setPage(pagerLong.page + 1)} 
-                disabled={pagerLong.page === pagerLong.pages}
-                className="px-3 py-1 border rounded disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
         </div>
 
-        {/* Competitors Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="p-4 border-b">
             <h3 className="font-medium">Competitors</h3>
@@ -290,25 +266,6 @@ const SEODashboard: React.FC = () => {
               ))}
             </tbody>
           </table>
-          <div className="p-4 border-t flex justify-between items-center">
-            <div>Showing {pagerComp.slice.length} of {pagerComp.total} competitors</div>
-            <div className="flex space-x-2">
-              <button 
-                onClick={() => pagerComp.setPage(pagerComp.page - 1)} 
-                disabled={pagerComp.page === 1}
-                className="px-3 py-1 border rounded disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <button 
-                onClick={() => pagerComp.setPage(pagerComp.page + 1)} 
-                disabled={pagerComp.page === pagerComp.pages}
-                className="px-3 py-1 border rounded disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
