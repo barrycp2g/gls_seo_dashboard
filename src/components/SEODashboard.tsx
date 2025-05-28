@@ -1,48 +1,44 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 
-// TypeScript interfaces matching Sheety API schema
+// Type definitions matching Sheety responses
 interface DomainInfo {
-  country_name: string;
-  country_code: string;
-  domain_name: string;
-  total_keywords: number;
-  total_keywords_brand: number;
-  total_keywords_non_brand: number;
-  avg_difficulty_brand: number;
-  avg_difficulty_non_brand: number;
-  nb_big_kw_opportunities: number;
+  countryName: string;
+  countryCode: string;
+  domainName: string;
+  totalKeywords: number;
+  totalKeywordsBrand: number;
+  totalKeywordsNonBrand: number;
+  avgDifficultyBrand: number;
+  avgDifficultyNonBrand: number;
+  nbBigKwOpportunities: number;
 }
 
 interface KeywordTypeItem {
-  country_code: string;
+  countryCode: string;
   name: string;
   percent: number;
-  color: string;
 }
 
 interface LongTailKeyword {
-  country_code: string;
+  countryCode: string;
   keyword: string;
-  tag: string;
   position: number;
   volume: number;
   difficulty: number;
   traffic: number;
   CPC: number;
-  position_type: string;
   intent: string;
 }
 
 interface Competitor {
-  country_code: string;
-  country_name: string;
+  countryCode: string;
   domain: string;
-  competitor_relevance: number;
-  common_keywords: number;
-  organic_keywords: number;
-  organic_traffic: number;
-  organic_cost: number;
-  google_ads_keywords: number;
+  competitorRelevance: number;
+  commonKeywords: number;
+  organicKeywords: number;
+  organicTraffic: number;
+  organicCost: number;
+  googleAdsKeywords: number;
 }
 
 interface SEOData {
@@ -53,253 +49,183 @@ interface SEOData {
   competitors: Competitor[];
 }
 
-// Cache hook for API responses
-const useCache = <T,>(key: string, ttl: number = 5 * 60 * 1000) => {
-  const cache = useRef<Map<string, { data: T; timestamp: number }>>(new Map());
-
-  const get = useCallback((cacheKey: string): T | null => {
-    const item = cache.current.get(cacheKey);
-    if (!item) return null;
-    if (Date.now() - item.timestamp > ttl) {
-      cache.current.delete(cacheKey);
-      return null;
-    }
-    return item.data;
-  }, [ttl]);
-
-  const set = useCallback((cacheKey: string, data: T) => {
-    cache.current.set(cacheKey, { data, timestamp: Date.now() });
-  }, []);
-
+// Simple cache hook
+const useCache = <T,>(ttl = 300000) => {
+  const ref = useRef<{ data?: T; time: number }>({ time: 0 });
+  const get = () => (Date.now() - ref.current.time < ttl ? ref.current.data : undefined);
+  const set = (data: T) => { ref.current = { data, time: Date.now() }; };
   return { get, set };
 };
 
-// Pagination hook (unchanged)
-const usePagination = <T,>(data: T[], initialPageSize = 10) => {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(initialPageSize);
-
-  const { totalPages, totalItems, paginatedData } = useMemo(() => {
-    const total = data.length;
-    const pages = Math.ceil(total / pageSize);
-    const start = (currentPage - 1) * pageSize;
-    const end = Math.min(start + pageSize, total);
-    return {
-      totalPages: pages,
-      totalItems: total,
-      paginatedData: data.slice(start, end)
-    };
-  }, [data, currentPage, pageSize]);
-
-  const changePageSize = useCallback((size: number) => {
-    setPageSize(size);
-    setCurrentPage(1);
-  }, []);
-
-  return {
-    paginatedData,
-    currentPage,
-    totalPages,
-    totalItems,
-    setPageSize: changePageSize,
-    setCurrentPage
-  };
-};
-
-// PieChart component
-const PieChart = ({ data }: { data: KeywordTypeItem[] }) => {
-  if (!data || data.length === 0) return null;
-  const size = 200;
-  const center = size / 2;
-  const radius = 80;
-
-  let cumulative = 0;
-  return (
-    <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-auto">
-      <circle cx={center} cy={center} r={radius} fill="#f3f4f6" />
-      {data.map((d, i) => {
-        const startAngle = (cumulative / 100) * 2 * Math.PI - Math.PI / 2;
-        const endAngle = ((cumulative + d.percent) / 100) * 2 * Math.PI - Math.PI / 2;
-        cumulative += d.percent;
-        const x1 = center + radius * Math.cos(startAngle);
-        const y1 = center + radius * Math.sin(startAngle);
-        const x2 = center + radius * Math.cos(endAngle);
-        const y2 = center + radius * Math.sin(endAngle);
-        const largeArcFlag = d.percent > 50 ? 1 : 0;
-        const pathData = `M ${center} ${center} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
-        return (
-          <path
-            key={i}
-            d={pathData}
-            fill={d.color}
-            stroke="#fff"
-            strokeWidth={2}
-          />
-        );
-      })}
-    </svg>
-  );
-};
-
-// API service with safe defaults and key mapping
+// API calling service
 class APIService {
-  static baseUrl = 'https://api.sheety.co/5bcc5e9b5a9271eb36b750afdfe11bae/bcSeoDashboard';
+  private static base = 'https://api.sheety.co/5bcc5e9b5a9271eb36b750afdfe11bae/bcSeoDashboard';
 
-  static async fetchSEOData(): Promise<SEOData> {
-    // Attempt all fetches in parallel
-    const endpoints = [
-      'domainInfo',
-      'keywordTypesBrand',
-      'keywordTypesNonBrand',
-      'longTailKeywords',
-      'competitors'
-    ];
-    const fetches = endpoints.map(path =>
-      fetch(`${this.baseUrl}/${path}`).then(r => r.json()).catch(() => null)
-    );
-    const [dom, br, nbr, lt, cp] = await Promise.all(fetches);
-
-    // Guard against missing data
-    const rawDomain = dom?.domainInfo ?? [];
-    const rawBrand = br?.keywordTypesBrand ?? [];
-    const rawNonBrand = nbr?.keywordTypesNonBrand ?? [];
-    const rawLongTail = lt?.longTailKeywords ?? [];
-    const rawComp = cp?.competitors ?? [];
-
-    // Color map for keyword types
-    const keywordColors: Record<string,string> = {
-      Informational: '#061ab1',
-      Commercial:    '#4d5fc7',
-      Transactional: '#F59E0B',
-      Navigational:  '#94a3b8'
+  static async fetchAll(): Promise<SEOData> {
+    const urls = {
+      domainInfo: `${this.base}/domainInfo`,
+      keywordTypesBrand: `${this.base}/keywordTypesBrand`,
+      keywordTypesNonBrand: `${this.base}/keywordTypesNonBrand`,
+      longTailKeywords: `${this.base}/longTailKeywords`,
+      competitors: `${this.base}/competitors`,
     };
 
-    // Map domain info keys to snake_case
-    const domainInfo: DomainInfo[] = rawDomain.map((it: any) => ({
-      country_name: it.countryName,
-      country_code: it.countryCode,
-      domain_name: it.domainName,
-      total_keywords: it.totalKeywords,
-      total_keywords_brand: it.totalKeywordsBrand,
-      total_keywords_non_brand: it.totalKeywordsNonBrand,
-      avg_difficulty_brand: it.avgDifficultyBrand,
-      avg_difficulty_non_brand: it.avgDifficultyNonBrand,
-      nb_big_kw_opportunities: it.nbBigKwOpportunities
-    }));
+    // fetch all in parallel
+    const [dRes, bRes, nbRes, ltRes, cRes] = await Promise.all(
+      Object.values(urls).map(u => fetch(u).then(r => r.json()))
+    );
 
-    // Map keyword types
-    const keywordTypesBrand: KeywordTypeItem[] = rawBrand.map((it: any) => ({
-      country_code: it.countryCode,
-      name: it.name,
-      percent: it.percent,
-      color: keywordColors[it.name] || '#666'
-    }));
-    const keywordTypesNonBrand: KeywordTypeItem[] = rawNonBrand.map((it: any) => ({
-      country_code: it.countryCode,
-      name: it.name,
-      percent: it.percent,
-      color: keywordColors[it.name] || '#666'
-    }));
-
-    // Long-tail keywords (keys assumed correct)
-    const longTailKeywords: LongTailKeyword[] = rawLongTail.map((it: any) => ({
-      country_code: it.countryCode,
-      keyword: it.keyword,
-      tag: it.tag,
-      position: it.position,
-      volume: it.volume,
-      difficulty: it.difficulty,
-      traffic: it.traffic,
-      CPC: it.CPC,
-      position_type: it.position_type,
-      intent: it.intent
-    }));
-
-    // Competitors map
-    const competitors: Competitor[] = rawComp.map((it: any) => ({
-      country_code: it.countryCode,
-      country_name: it.countryName,
-      domain: it.domain,
-      competitor_relevance: it.competitor_relevance,
-      common_keywords: it.common_keywords,
-      organic_keywords: it.organic_keywords,
-      organic_traffic: it.organic_traffic,
-      organic_cost: it.organic_cost,
-      google_ads_keywords: it.google_ads_keywords
-    }));
-
-    return { domainInfo, keywordTypesBrand, keywordTypesNonBrand, longTailKeywords, competitors };
+    return {
+      domainInfo: dRes.domainInfo,
+      keywordTypesBrand: bRes.keywordTypesBrand,
+      keywordTypesNonBrand: nbRes.keywordTypesNonBrand,
+      longTailKeywords: ltRes.longTailKeywords,
+      competitors: cRes.competitors,
+    };
   }
 }
 
-// Main Dashboard Component
+// Pagination hook
+const usePagination = <T,>(items: T[], pageSize = 10) => {
+  const [page, setPage] = useState(1);
+  const total = items.length;
+  const last = Math.ceil(total / pageSize);
+  const slice = useMemo(
+    () => items.slice((page-1)*pageSize, page*pageSize),
+    [items, page, pageSize]
+  );
+  return { slice, page, last, total, setPage };
+};
+
+// Main component
 const SEODashboard: React.FC = () => {
-  const [selectedCountry, setSelectedCountry] = useState<string>('PL');
-  const [selectedLanguage, setSelectedLanguage] = useState<'native'|'english'>('native');
-  const [isLoading, setIsLoading] = useState(true);
-  const [data, setData] = useState<SEOData>({ domainInfo: [], keywordTypesBrand: [], keywordTypesNonBrand: [], longTailKeywords: [], competitors: [] });
+  const [country, setCountry] = useState<'PL'|'ES'|'FR'|'DE'>('PL');
+  const [native, setNative] = useState(true);
+  const [data, setData] = useState<SEOData>();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>();
 
-  const cache = useCache<SEOData>('seoData');
-  const abortRef = useRef<AbortController|null>(null);
+  const cache = useCache<SEOData>();
 
-  const countries = [
-    { code: 'PL', native: 'PL-PL', english: 'PL-EN', name: 'Poland' },
-    { code: 'ES', native: 'ES-ES', english: 'ES-EN', name: 'Spain' },
-    { code: 'FR', native: 'FR-FR', english: 'FR-EN', name: 'France' },
-    { code: 'DE', native: 'DE-DE', english: 'DE-EN', name: 'Germany' }
-  ];
-
-  const getCurrentTag = useCallback(() => {
-    const c = countries.find(c=>c.code===selectedCountry)!;
-    return selectedLanguage==='native' ? c.native : c.english;
-  }, [selectedCountry, selectedLanguage]);
-
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    const cacheKey = 'all-seo-data';
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      setData(cached);
-      setIsLoading(false);
-      return;
-    }
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-
-    try {
-      const seo = await APIService.fetchSEOData();
-      cache.set(cacheKey, seo);
-      setData(seo);
-    } catch (err) {
-      console.error('API fetch failed, using empty data', err);
-      setData({ domainInfo: [], keywordTypesBrand: [], keywordTypesNonBrand: [], longTailKeywords: [], competitors: [] });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [cache]);
+  const tag = `${country}-${native?country:'EN'}`;
 
   useEffect(() => {
-    loadData();
-    return () => { abortRef.current?.abort(); };
-  }, [loadData]);
+    const load = async () => {
+      setLoading(true);
+      try {
+        const cached = cache.get();
+        if (cached) { setData(cached); return; }
+        const seo = await APIService.fetchAll();
+        cache.set(seo);
+        setData(seo);
+      } catch (e) {
+        setError('Failed to load SEO data');
+      } finally { setLoading(false); }
+    };
+    load();
+  }, [country, native]);
 
-  if (isLoading) {
-    return <div className="p-8 text-center">Loading dashboard…</div>;
-  }
+  if (loading) return <div className="p-8 text-center">Loading…</div>;
+  if (error)   return <div className="p-8 text-center text-red-600">{error}</div>;
+  if (!data)  return null;
 
-  const tag = getCurrentTag();
-  const overview = data.domainInfo.find(d=>d.country_code===tag) || null;
-  const brandPie = data.keywordTypesBrand.filter(x=>x.country_code===tag);
-  const nonBrandPie = data.keywordTypesNonBrand.filter(x=>x.country_code===tag);
-  const longTail = data.longTailKeywords.filter(x=>x.country_code===tag);
-  const competitors = data.competitors.filter(x=>x.country_code===selectedCountry);
+  // filter
+  const overview = data.domainInfo.find(d=>d.countryCode===tag);
+  const brandPie = data.keywordTypesBrand.filter(k=>k.countryCode===tag);
+  const nonPie   = data.keywordTypesNonBrand.filter(k=>k.countryCode===tag);
+  const longTail = data.longTailKeywords.filter(l=>l.countryCode===tag);
+  const comps    = data.competitors.filter(c=>c.countryCode===country);
 
-  const kp = usePagination(longTail, 10);
-  const cp = usePagination(competitors, 5);
+  const pLong = usePagination(longTail);
+  const pComp = usePagination(comps);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* … your existing JSX, unchanged … */}
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+      {/* Controls */}
+      <div className="flex items-center space-x-4">
+        <select value={country} onChange={e=>setCountry(e.target.value as any)}>
+          <option value="PL">Poland</option>
+          <option value="ES">Spain</option>
+          <option value="FR">France</option>
+          <option value="DE">Germany</option>
+        </select>
+        <label><input type="checkbox" checked={native} onChange={()=>setNative(x=>!x)} /> Native</label>
+      </div>
+
+      {/* Overview */}
+      {overview && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-4 bg-white rounded shadow">
+            <h4>Total Keywords</h4>
+            <p className="text-2xl font-bold">{overview.totalKeywords}</p>
+          </div>
+          <div className="p-4 bg-white rounded shadow">
+            <h4>Brand Difficulty</h4>
+            <p>{overview.avgDifficultyBrand.toFixed(1)}</p>
+          </div>
+          <div className="p-4 bg-white rounded shadow">
+            <h4>Non-Brand Difficulty</h4>
+            <p>{overview.avgDifficultyNonBrand.toFixed(1)}</p>
+          </div>
+          <div className="p-4 bg-white rounded shadow">
+            <h4>Big Opportunities</h4>
+            <p>{overview.nbBigKwOpportunities}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Keyword Type Pie Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white p-4 rounded shadow">
+          <h4>Brand Split</h4>
+          <PieChart data={brandPie} />
+        </div>
+        <div className="bg-white p-4 rounded shadow">
+          <h4>Non-Brand Split</h4>
+          <PieChart data={nonPie} />
+        </div>
+      </div>
+
+      {/* Competitors Table */}
+      <div className="bg-white rounded shadow overflow-auto">
+        <table className="min-w-full">
+          <thead className="bg-gray-100">
+            <tr>
+              <th>Domain</th><th>Relevance</th><th>Traffic</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pComp.slice.map(c=>(
+              <tr key={c.domain}>
+                <td className="p-2">{c.domain}</td>
+                <td className="p-2">{(c.competitorRelevance*100).toFixed(0)}%</td>
+                <td className="p-2">{c.organicTraffic.toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Long-tail Table */}
+      <div className="bg-white rounded shadow overflow-auto">
+        <table className="min-w-full">
+          <thead className="bg-gray-100">
+            <tr>
+              <th>Keyword</th><th>Pos</th><th>Vol</th><th>Diff</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pLong.slice.map(l=>(
+              <tr key={l.keyword}>
+                <td className="p-2">{l.keyword}</td>
+                <td className="p-2">{l.position}</td>
+                <td className="p-2">{l.volume}</td>
+                <td className="p-2">{l.difficulty}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
