@@ -1,9 +1,9 @@
+```tsx
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 
-// TypeScript interfaces
+// TypeScript interfaces matching Sheety API schema
 interface DomainInfo {
-  country_name: string;
-  country_code: string;
+  country_code: string; // "PL-EN", "ES-ES", etc.
   total_keywords: number;
   total_keywords_brand: number;
   total_keywords_non_brand: number;
@@ -12,10 +12,10 @@ interface DomainInfo {
   nb_big_kw_opportunities: number;
 }
 
-interface KeywordType {
+interface KeywordTypeItem {
   country_code: string;
-  percent: number;
   name: string;
+  percent: number;
 }
 
 interface LongTailKeyword {
@@ -30,7 +30,7 @@ interface LongTailKeyword {
 }
 
 interface Competitor {
-  country_code: string;
+  country_code: string; // e.g. "PL" or "ES"
   domain: string;
   competitor_relevance: number;
   common_keywords: number;
@@ -42,121 +42,127 @@ interface Competitor {
 
 interface SEOData {
   domainInfo: DomainInfo[];
-  keywordTypesBrand: KeywordType[];
-  keywordTypesNonBrand: KeywordType[];
+  keywordTypesBrand: KeywordTypeItem[];
+  keywordTypesNonBrand: KeywordTypeItem[];
   longTailKeywords: LongTailKeyword[];
   competitors: Competitor[];
 }
 
-// Cache hook
-const useCache = <T,>(ttl: number = 300_000) => {
-  const cache = useRef<{ data?: T; ts: number }>({ ts: 0 });
-  const get = () => {
-    if (Date.now() - cache.current.ts < ttl) return cache.current.data;
-    return undefined;
-  };
-  const set = (data: T) => {
-    cache.current = { data, ts: Date.now() };
-  };
+// Simple cache hook
+const useCache = <T,>(ttl = 300000) => {
+  const ref = useRef<{ data?: T; timestamp: number }>({ timestamp: 0 });
+  const get = () => Date.now() - ref.current.timestamp < ttl ? ref.current.data : undefined;
+  const set = (data: T) => { ref.current = { data, timestamp: Date.now() }; };
   return { get, set };
 };
 
-// Pagination hook (unchanged) ...
+// Pagination hook (unchanged)
+const usePagination = <T,>(items: T[], initialSize = 10) => {
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(initialSize);
+  const total = items.length;
+  const pages = Math.ceil(total / size);
+  const slice = items.slice((page - 1) * size, page * size);
+  return { slice, page, pages, total, setPage, setSize };
+};
 
-// PieChart component (unchanged) ...
+// PieChart component (unchanged)
+const PieChart = ({ data }: { data: KeywordTypeItem[] }) => {
+  const total = data.reduce((s, x) => s + x.percent, 0);
+  let acc = 0;
+  return (
+    <svg viewBox="0 0 200 200" className="w-full h-auto">
+      <circle cx={100} cy={100} r={80} fill="#f3f4f6" />
+      {data.map((d, i) => {
+        const start = (acc / total) * 2 * Math.PI - Math.PI/2;
+        const end = ((acc + d.percent) / total) * 2 * Math.PI - Math.PI/2;
+        acc += d.percent;
+        const x1 = 100 + 80 * Math.cos(start);
+        const y1 = 100 + 80 * Math.sin(start);
+        const x2 = 100 + 80 * Math.cos(end);
+        const y2 = 100 + 80 * Math.sin(end);
+        const large = d.percent / total > 0.5 ? 1 : 0;
+        return (
+          <path
+            key={i}
+            d={`M100,100 L${x1},${y1} A80,80 0 ${large} 1 ${x2},${y2} Z`}
+            fill={['#3B82F6','#10B981','#F59E0B','#EF4444'][i]}
+            stroke="#fff" strokeWidth={2}
+          />
+        );
+      })}
+    </svg>
+  );
+};
 
 const SEODashboard: React.FC = () => {
-  const [selectedCountry, setSelectedCountry] = useState<string>('PL');
-  const [selectedLanguage, setSelectedLanguage] = useState<'native' | 'english'>('native');
+  const [selectedCountry, setSelectedCountry] = useState<'PL'|'ES'|'FR'|'DE'>('PL');
+  const [langNative, setLangNative] = useState(true);
   const [data, setData] = useState<SEOData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string| null>(null);
 
   const cache = useCache<SEOData>();
 
-  const countries = [
-    { code: 'PL', name: 'Poland', native: 'PL-PL', english: 'PL-EN' },
-    { code: 'ES', name: 'Spain', native: 'ES-ES', english: 'ES-EN' },
-    { code: 'FR', name: 'France', native: 'FR-FR', english: 'FR-EN' },
-    { code: 'DE', name: 'Germany', native: 'DE-DE', english: 'DE-EN' },
-  ];
+  // Compose tag: e.g. "PL-PL" or "PL-EN"
+  const tag = `${selectedCountry}-${langNative ? selectedCountry : 'EN'}`;
 
-  const selectedTag = useMemo(() => {
-    const country = countries.find(c => c.code === selectedCountry)!;
-    return selectedLanguage === 'native' ? country.native : country.english;
-  }, [selectedCountry, selectedLanguage]);
-
-  // Fetch functions
-  const fetchAll = useCallback(async () => {
-    setIsLoading(true);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
     setError(null);
     try {
-      const [domainRes, brandRes, nonBrandRes, longTailRes, compRes] = await Promise.all([
-        fetch('https://api.sheety.co/.../domainInfo').then(r => r.json()),
-        fetch('https://api.sheety.co/.../keywordTypesBrand').then(r => r.json()),
-        fetch('https://api.sheety.co/.../keywordTypesNonBrand').then(r => r.json()),
-        fetch('https://api.sheety.co/.../longTailKeywords').then(r => r.json()),
-        fetch('https://api.sheety.co/.../competitors').then(r => r.json()),
+      const cached = cache.get();
+      if (cached) { setData(cached); return; }
+
+      const [domRes, brandRes, nonBrandRes, longRes, compRes] = await Promise.all([
+        fetch('https://api.sheety.co/.../domainInfo').then(r=>r.json()),
+        fetch('https://api.sheety.co/.../keywordTypesBrand').then(r=>r.json()),
+        fetch('https://api.sheety.co/.../keywordTypesNonBrand').then(r=>r.json()),
+        fetch('https://api.sheety.co/.../longTailKeywords').then(r=>r.json()),
+        fetch('https://api.sheety.co/.../competitors').then(r=>r.json()),
       ]);
-      const seoData: SEOData = {
-        domainInfo: domainRes.bcSeoDashboard,
+
+      const seo: SEOData = {
+        domainInfo: domRes.bcSeoDashboard,
         keywordTypesBrand: brandRes.bcSeoDashboard,
         keywordTypesNonBrand: nonBrandRes.bcSeoDashboard,
-        longTailKeywords: longTailRes.bcSeoDashboard,
+        longTailKeywords: longRes.bcSeoDashboard,
         competitors: compRes.bcSeoDashboard,
       };
-      cache.set(seoData);
-      setData(seoData);
-    } catch (e) {
-      setError('Failed to load data');
+      cache.set(seo);
+      setData(seo);
+    } catch {
+      setError('Error loading data');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   }, [cache]);
 
-  useEffect(() => {
-    const cached = cache.get();
-    if (cached) { setData(cached); setIsLoading(false); }
-    else fetchAll();
-  }, [fetchAll]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Filtered data
-  const filteredDomain = useMemo(() =>
-    data?.domainInfo.find(d => d.country_code === selectedTag) ?? null, [data, selectedTag]
-  );
+  // Filtered slices
+  const overview = data?.domainInfo.find(d=>d.country_code===tag) ?? null;
+  const brandPie = data?.keywordTypesBrand.filter(k=>k.country_code===tag) ?? [];
+  const nonBrandPie = data?.keywordTypesNonBrand.filter(k=>k.country_code===tag) ?? [];
+  const longTail = data?.longTailKeywords.filter(l=>l.country_code===tag) ?? [];
+  const competitors = data?.competitors.filter(c=>c.country_code===selectedCountry) ?? [];
 
-  const filteredBrand = useMemo(() =>
-    data?.keywordTypesBrand.filter(k => k.country_code === selectedTag) ?? [],
-    [data, selectedTag]
-  );
+  const pagerLong = usePagination(longTail, 10);
+  const pagerComp = usePagination(competitors, 5);
 
-  const filteredNonBrand = useMemo(() =>
-    data?.keywordTypesNonBrand.filter(k => k.country_code === selectedTag) ?? [],
-    [data, selectedTag]
-  );
-
-  const filteredLongTail = useMemo(() =>
-    data?.longTailKeywords.filter(l => l.country_code === selectedTag) ?? [],
-    [data, selectedTag]
-  );
-
-  const filteredCompetitors = useMemo(() =>
-    data?.competitors.filter(c => c.country_code === selectedCountry) ?? [],
-    [data, selectedCountry]
-  );
-
-  if (isLoading) return <div>Loading...</div>;
+  if (loading) return <div>Loading...</div>;
   if (error) return <div>{error}</div>;
 
   return (
-    <div className="...">
-      {/* Header, Tabs, Toggle unchanged */}
-      {/* Overview using filteredDomain */}
-      {/* PieCharts using filteredBrand and filteredNonBrand */}
-      {/* Competitors table using filteredCompetitors */}
-      {/* Long-tail table using filteredLongTail */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Header & Controls... unchanged */}
+      {/* Overview Cards */}
+      {/* Pie Charts */}
+      {/* Competitors Table */}
+      {/* Long-tail Table */}
     </div>
   );
 };
 
 export default SEODashboard;
+```
