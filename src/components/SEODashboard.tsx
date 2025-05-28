@@ -114,7 +114,7 @@ const SEODashboard: React.FC = () => {
       setLoading(true);
       try {
         const cached = cache.get();
-        if (cached) { setData(cached); return; }
+        if (cached) { setData(cached); setLoading(false); return; }
         const seo = await APIService.fetchAll();
         cache.set(seo);
         setData(seo);
