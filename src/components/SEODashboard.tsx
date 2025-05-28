@@ -649,29 +649,29 @@ const SEODashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white text-gray-800 p-4 md:p-6 shadow-lg">
+            {/* Header */}
+      <div className="bg-white text-gray-800 p-4 md:p-6 shadow-lg relative z-20">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
             <div className="flex items-center space-x-3 md:space-x-4">
-              <div className="bg-white px-2 py-1 md:px-3 md:py-2 rounded-lg">
+              <div className="bg-gray-50 px-3 py-2 md:px-4 md:py-3 rounded-lg shadow-sm">
                 <img 
                   src="https://barrycp2g.sirv.com/logo.png"
                   alt="Parcel2Go"
-                  className="h-6 md:h-8"
+                  className="h-7 md:h-9"
                 />
               </div>
-              <div className="bg-white px-2 py-1 md:px-3 md:py-2 rounded-lg">
+              <div className="bg-gray-50 px-3 py-2 md:px-4 md:py-3 rounded-lg shadow-sm">
                 <img 
                   src="https://barrycp2g.sirv.com/gls-logo-png_seeklogo-428620.png"
                   alt="GLS"
-                  className="h-6 md:h-8"
+                  className="h-8 md:h-11"
                 />
               </div>
             </div>
             <div className="text-left md:text-right">
               <h1 className="text-xl md:text-2xl font-bold text-[#061ab1]">Multi-Country SEO Dashboard</h1>
-              <p className="text-sm md:text-base text-yellow-300">Comprehensive keyword analysis across European markets</p>
+              <p className="text-sm md:text-base text-gray-600">Comprehensive keyword analysis across European markets</p>
             </div>
           </div>
         </div>
