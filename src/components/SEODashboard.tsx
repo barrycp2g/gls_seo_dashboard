@@ -83,12 +83,7 @@ const PieChart = ({ data }: { data: KeywordTypeItem[] }) => {
         const y2 = 100 + 80 * Math.sin(end);
         const large = d.percent / total > 0.5 ? 1 : 0;
         return (
-          <path
-            key={i}
-            d={`M100,100 L${x1},${y1} A80,80 0 ${large} 1 ${x2},${y2} Z`}
-            fill={['#3B82F6','#10B981','#F59E0B','#EF4444'][i]}
-            stroke="#fff" strokeWidth={2}
-          />
+          <path$1d={"M100,100 L" + x1 + "," + y1 + " A80,80 0 " + large + " 1 " + x2 + "," + y2 + " Z"}$2/>
         );
       })}
     </svg>
