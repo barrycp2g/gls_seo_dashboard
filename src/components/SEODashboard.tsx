@@ -26,7 +26,7 @@ interface LongTailKeyword {
   volume: number;
   difficulty: number;
   traffic: number;
-  CPC: number;
+  cpc: number;
   intent: string;
 }
 
@@ -88,13 +88,19 @@ class APIService {
 const PieChart = ({ data }: { data: KeywordTypeItem[] }) => {
   if (!data || data.length === 0) return null;
   
-  const total = data.reduce((sum, item) => sum + item.percent, 0);
+  // Convert decimal percentages to whole numbers if needed
+  const processedData = data.map(item => ({
+    ...item,
+    percent: item.percent < 1 ? item.percent * 100 : item.percent
+  }));
+  
+  const total = processedData.reduce((sum, item) => sum + item.percent, 0);
   let cumulative = 0;
   const size = 200;
   const radius = 80;
   const center = size / 2;
   
-  const paths = data.map((item, idx) => {
+  const paths = processedData.map((item, idx) => {
     const value = item.percent;
     const startAngle = (cumulative / total) * 2 * Math.PI - Math.PI/2;
     const endAngle = ((cumulative + value) / total) * 2 * Math.PI - Math.PI/2;
@@ -107,9 +113,31 @@ const PieChart = ({ data }: { data: KeywordTypeItem[] }) => {
     
     const largeArc = value / total > 0.5 ? 1 : 0;
     const d = [`M ${center} ${center}`, `L ${x1} ${y1}`, `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`, 'Z'].join(' ');
-    const colors = ['#3B82F6','#10B981','#F59E0B','#EF4444'];
+    const colors = ['#061ab1','#4d5fc7','#F59E0B','#94a3b8'];
     
-    return <path key={idx} d={d} fill={colors[idx % colors.length]} stroke="white" strokeWidth={2}/>;
+    // Add percentage text for larger slices
+    const midAngle = (startAngle + endAngle) / 2;
+    const textX = center + (radius * 0.7) * Math.cos(midAngle);
+    const textY = center + (radius * 0.7) * Math.sin(midAngle);
+    
+    return (
+      <g key={idx}>
+        <path d={d} fill={colors[idx % colors.length]} stroke="white" strokeWidth={2}/>
+        {value > 10 && (
+          <text
+            x={textX}
+            y={textY}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="white"
+            fontSize="14"
+            fontWeight="bold"
+          >
+            {Math.round(value)}%
+          </text>
+        )}
+      </g>
+    );
   });
   
   return (
@@ -243,7 +271,7 @@ const SEODashboard = () => {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#061ab1] mx-auto"></div>
           <p className="mt-4 text-xl font-semibold text-gray-700">Loading SEO Dashboard...</p>
         </div>
       </div>
@@ -261,7 +289,7 @@ const SEODashboard = () => {
             </svg>
           </div>
           <p className="text-xl font-semibold text-gray-700">{error}</p>
-          <button onClick={() => loadData(true)} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          <button onClick={() => loadData(true)} className="mt-4 px-4 py-2 bg-[#061ab1] text-white rounded hover:bg-[#0515a0] transition-colors">
             Retry
           </button>
         </div>
@@ -273,28 +301,51 @@ const SEODashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow-lg p-6">
+      <div className="bg-white p-4 md:p-6 shadow-lg relative z-20">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-2xl font-bold text-gray-900">Multi-Country SEO Dashboard</h1>
-          <p className="text-gray-600">Comprehensive keyword analysis across European markets</p>
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
+            <div className="flex items-center space-x-3 md:space-x-4">
+              <div className="bg-gray-50 px-3 py-2 md:px-4 md:py-3 rounded-lg shadow-sm">
+                <img 
+                  src="https://barrycp2g.sirv.com/logo.png"
+                  alt="Parcel2Go"
+                  className="h-7 md:h-9"
+                />
+              </div>
+              <div className="bg-gray-50 px-3 py-2 md:px-4 md:py-3 rounded-lg shadow-sm">
+                <img 
+                  src="https://barrycp2g.sirv.com/gls-logo-png_seeklogo-428620.png"
+                  alt="GLS"
+                  className="h-8 md:h-11"
+                />
+              </div>
+            </div>
+            <div className="text-left md:text-right">
+              <h1 className="text-xl md:text-2xl font-bold text-[#061ab1]">Multi-Country SEO Dashboard</h1>
+              <p className="text-sm md:text-base text-gray-600">Comprehensive keyword analysis across European markets</p>
+            </div>
+          </div>
         </div>
       </div>
       
+      {/* Visual Separator */}
+      <div className="h-1 bg-gradient-to-r from-[#061ab1] via-[#4d5fc7] to-[#061ab1] opacity-20"></div>
+      
       {/* Country Tabs */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex space-x-1">
+      <div className="bg-white shadow-md border-b relative z-10">
+        <div className="max-w-7xl mx-auto px-3 md:px-6">
+          <div className="flex overflow-x-auto space-x-1">
             {countries.map(country => (
               <button
                 key={country.code}
-                className={`px-6 py-4 font-medium border-b-2 transition-all ${
+                className={`flex-shrink-0 px-4 md:px-6 py-3 md:py-4 font-medium border-b-3 transition-all ${
                   selectedCountry === country.code
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                    ? 'border-[#061ab1] text-[#061ab1] bg-blue-50'
+                    : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-[#061ab1]'
                 }`}
                 onClick={() => setSelectedCountry(country.code)}
               >
-                {country.name}
+                <span className="text-base md:text-lg">{country.name}</span>
               </button>
             ))}
           </div>
@@ -302,29 +353,32 @@ const SEODashboard = () => {
       </div>
       
       {/* Language Toggle */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <span className="text-sm font-medium text-gray-700">Language:</span>
+      <div className="bg-gray-50 shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-3 md:px-6 py-3 md:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+            <div className="flex items-center space-x-3 md:space-x-4">
+              <span className="text-xs md:text-sm font-medium text-gray-700">Language:</span>
               <button
                 onClick={() => setSelectedLanguage(prev => prev === 'native' ? 'english' : 'native')}
-                className={`relative w-12 h-6 rounded-full transition-colors ${
-                  selectedLanguage === 'english' ? 'bg-blue-600' : 'bg-gray-300'
+                className={`relative inline-block w-12 md:w-14 h-6 md:h-7 rounded-full transition-colors duration-200 ease-in-out ${
+                  selectedLanguage === 'english' ? 'bg-[#061ab1]' : 'bg-gray-400'
                 }`}
               >
-                <div className={`absolute w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                  selectedLanguage === 'english' ? 'translate-x-6' : 'translate-x-0.5'
-                } top-0.5`} />
+                <div className={`absolute left-0.5 md:left-1 top-0.5 md:top-1 w-5 h-5 bg-white rounded-full transition-transform duration-200 ease-in-out shadow-sm ${
+                  selectedLanguage === 'english' ? 'transform translate-x-6 md:translate-x-7' : ''
+                }`} />
               </button>
-              <span className="text-sm text-gray-600">
+              <span className="text-xs md:text-sm font-medium text-gray-600">
                 {selectedLanguage === 'native' ? `Native (${currentTag})` : `English (${currentTag})`}
               </span>
             </div>
             <button
               onClick={() => loadData(true)}
-              className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+              className="flex items-center justify-center sm:justify-start px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm bg-white hover:bg-gray-100 rounded border border-gray-300 transition-colors shadow-sm"
             >
+              <svg className="w-3 h-3 md:w-4 md:h-4 mr-1.5 md:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
               Refresh Data
             </button>
           </div>
@@ -339,7 +393,7 @@ const SEODashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-sm font-medium text-gray-500 mb-2">Total Keywords</h3>
-              <div className="text-3xl font-bold text-gray-900">
+              <div className="text-3xl font-bold text-[#061ab1]">
                 {filteredData.domainInfo?.totalKeywords?.toLocaleString() || '0'}
               </div>
             </div>
@@ -363,7 +417,7 @@ const SEODashboard = () => {
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-sm font-medium text-gray-500 mb-2">Big Opportunities</h3>
-              <div className="text-3xl font-bold text-green-600">
+              <div className="text-3xl font-bold text-[#061ab1]">
                 {filteredData.domainInfo?.nbBigKwOpportunities || '0'}
               </div>
             </div>
@@ -373,23 +427,23 @@ const SEODashboard = () => {
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Brand vs Non-Brand Split</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">
+              <div className="text-center p-4 bg-[#061ab1] bg-opacity-10 rounded-lg border border-[#061ab1] border-opacity-20">
+                <div className="text-2xl font-bold text-[#061ab1]">
                   {filteredData.domainInfo?.totalKeywordsBrand?.toLocaleString() || '0'}
                 </div>
-                <div className="text-gray-600">Brand Keywords</div>
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-gray-700 font-medium">Brand Keywords</div>
+                <div className="text-xs text-gray-600 mt-1">
                   {filteredData.domainInfo && filteredData.domainInfo.totalKeywords > 0
                     ? `${((filteredData.domainInfo.totalKeywordsBrand / filteredData.domainInfo.totalKeywords) * 100).toFixed(1)}%`
                     : '0%'}
                 </div>
               </div>
-              <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                <div className="text-2xl font-bold text-yellow-600">
+              <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-200">
+                <div className="text-2xl font-bold text-amber-700">
                   {filteredData.domainInfo?.totalKeywordsNonBrand?.toLocaleString() || '0'}
                 </div>
-                <div className="text-gray-600">Non-Brand Keywords</div>
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-gray-700 font-medium">Non-Brand Keywords</div>
+                <div className="text-xs text-gray-600 mt-1">
                   {filteredData.domainInfo && filteredData.domainInfo.totalKeywords > 0
                     ? `${((filteredData.domainInfo.totalKeywordsNonBrand / filteredData.domainInfo.totalKeywords) * 100).toFixed(1)}%`
                     : '0%'}
@@ -410,12 +464,15 @@ const SEODashboard = () => {
                 <PieChart data={filteredData.brandKeywords} />
               </div>
               <div className="mt-4 space-y-2">
-                {filteredData.brandKeywords.map((item, idx) => (
-                  <div key={idx} className="flex items-center text-sm">
-                    <div className={`w-3 h-3 rounded-full mr-2`} style={{backgroundColor: ['#3B82F6','#10B981','#F59E0B','#EF4444'][idx % 4]}} />
-                    <span className="text-gray-600">{item.name}: {item.percent}%</span>
-                  </div>
-                ))}
+                {filteredData.brandKeywords.map((item, idx) => {
+                  const displayPercent = item.percent < 1 ? Math.round(item.percent * 100) : Math.round(item.percent);
+                  return (
+                    <div key={idx} className="flex items-center text-sm">
+                      <div className={`w-3 h-3 rounded-full mr-2`} style={{backgroundColor: ['#061ab1','#4d5fc7','#F59E0B','#94a3b8'][idx % 4]}} />
+                      <span className="text-gray-600">{item.name}: {displayPercent}%</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
             
@@ -425,12 +482,15 @@ const SEODashboard = () => {
                 <PieChart data={filteredData.nonBrandKeywords} />
               </div>
               <div className="mt-4 space-y-2">
-                {filteredData.nonBrandKeywords.map((item, idx) => (
-                  <div key={idx} className="flex items-center text-sm">
-                    <div className={`w-3 h-3 rounded-full mr-2`} style={{backgroundColor: ['#3B82F6','#10B981','#F59E0B','#EF4444'][idx % 4]}} />
-                    <span className="text-gray-600">{item.name}: {item.percent}%</span>
-                  </div>
-                ))}
+                {filteredData.nonBrandKeywords.map((item, idx) => {
+                  const displayPercent = item.percent < 1 ? Math.round(item.percent * 100) : Math.round(item.percent);
+                  return (
+                    <div key={idx} className="flex items-center text-sm">
+                      <div className={`w-3 h-3 rounded-full mr-2`} style={{backgroundColor: ['#061ab1','#4d5fc7','#F59E0B','#94a3b8'][idx % 4]}} />
+                      <span className="text-gray-600">{item.name}: {displayPercent}%</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -460,7 +520,7 @@ const SEODashboard = () => {
                     <td className="px-6 py-4 text-sm text-gray-500">
                       <div className="flex items-center">
                         <div className="w-24 bg-gray-200 rounded-full h-2 mr-2">
-                          <div className="h-2 rounded-full bg-blue-500" style={{width: `${comp.competitorRelevance * 100}%`}} />
+                          <div className="h-2 rounded-full bg-[#061ab1]" style={{width: `${comp.competitorRelevance * 100}%`}} />
                         </div>
                         <span>{(comp.competitorRelevance * 100).toFixed(0)}%</span>
                       </div>
@@ -536,7 +596,7 @@ const SEODashboard = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">{kw.traffic.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{formatCurrency(kw.CPC)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500">{formatCurrency(kw.cpc)}</td>
                     <td className="px-6 py-4 text-sm">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         kw.intent === 'Commercial' ? 'bg-green-100 text-green-800' :
@@ -579,9 +639,9 @@ const SEODashboard = () => {
       </div>
       
       {/* Footer */}
-      <div className="bg-gray-800 text-white p-6 text-center">
-        <p className="text-sm">© 2025 Parcel2Go × GLS - Multi-Country SEO Dashboard</p>
-        <p className="text-xs text-gray-400 mt-1">Last updated: {new Date().toLocaleString()}</p>
+      <div className="bg-[#061ab1] text-white p-6 text-center">
+        <p className="text-sm font-medium">© 2025 Parcel2Go × GLS - Multi-Country SEO Dashboard</p>
+        <p className="text-xs text-blue-200 mt-1">Last updated: {new Date().toLocaleString()}</p>
       </div>
     </div>
   );
