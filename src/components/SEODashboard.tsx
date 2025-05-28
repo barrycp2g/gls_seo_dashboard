@@ -262,22 +262,13 @@ class APIService {
 
   static async fetchSEOData(): Promise<SEOData> {
     try {
-      const [domainInfoRes, keywordTypesBrandRes, keywordTypesNonBrandRes, longTailKeywordsRes, competitorsRes] = 
+      const [domRes, brandRes, nonBrandRes, longRes, compRes] = 
         await Promise.all([
-          fetch(`${this.baseUrl}/domainInfo`),
-          fetch(`${this.baseUrl}/keywordTypesBrand`),
-          fetch(`${this.baseUrl}/keywordTypesNonBrand`),
-          fetch(`${this.baseUrl}/longTailKeywords`),
-          fetch(`${this.baseUrl}/competitors`)
-        ]);
-
-      const [domainInfo, keywordTypesBrand, keywordTypesNonBrand, longTailKeywords, competitors] = 
-        await Promise.all([
-          domainInfoRes.json(),
-          keywordTypesBrandRes.json(),
-          keywordTypesNonBrandRes.json(),
-          longTailKeywordsRes.json(),
-          competitorsRes.json()
+          fetch(`${this.baseUrl}/domainInfo`).then(r => r.json()),
+          fetch(`${this.baseUrl}/keywordTypesBrand`).then(r => r.json()),
+          fetch(`${this.baseUrl}/keywordTypesNonBrand`).then(r => r.json()),
+          fetch(`${this.baseUrl}/longTailKeywords`).then(r => r.json()),
+          fetch(`${this.baseUrl}/competitors`).then(r => r.json())
         ]);
 
       // Map colors to keyword types
@@ -289,22 +280,22 @@ class APIService {
       };
 
       // Add colors to keyword types
-      const brandWithColors = keywordTypesBrand.keywordTypesBrand.map(item => ({
+      const brandWithColors = brandRes.bcSeoDashboard.map(item => ({
         ...item,
         color: keywordColors[item.name] || '#666666'
       }));
 
-      const nonBrandWithColors = keywordTypesNonBrand.keywordTypesNonBrand.map(item => ({
+      const nonBrandWithColors = nonBrandRes.bcSeoDashboard.map(item => ({
         ...item,
         color: keywordColors[item.name] || '#666666'
       }));
 
       return {
-        domainInfo: domainInfo.domainInfo,
+        domainInfo: domRes.bcSeoDashboard,
         keywordTypesBrand: brandWithColors,
         keywordTypesNonBrand: nonBrandWithColors,
-        longTailKeywords: longTailKeywords.longTailKeywords,
-        competitors: competitors.competitors
+        longTailKeywords: longRes.bcSeoDashboard,
+        competitors: compRes.bcSeoDashboard
       };
     } catch (error) {
       console.error('Error fetching SEO data:', error);
