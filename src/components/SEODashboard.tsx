@@ -188,7 +188,8 @@ const SEODashboard = () => {
     { code: 'PL', name: 'Poland', native: 'PL-PL', english: 'PL-EN' },
     { code: 'ES', name: 'Spain', native: 'ES-ES', english: 'ES-EN' },
     { code: 'FR', name: 'France', native: 'FR-FR', english: 'FR-EN' },
-    { code: 'DE', name: 'Germany', native: 'DE-DE', english: 'DE-EN' }
+    { code: 'DE', name: 'Germany', native: 'DE-DE', english: 'DE-EN' },
+    { code: 'NL', name: 'Netherlands', native: 'NL-NL', english: 'NL-EN' }
   ];
   
   // Load data
@@ -416,7 +417,7 @@ const SEODashboard = () => {
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Opportunities (pos. 2-10)</h3>
+              <h3 className="text-sm font-medium text-gray-500 mb-2">Big Opportunities</h3>
               <div className="text-3xl font-bold text-[#061ab1]">
                 {filteredData.domainInfo?.nbBigKwOpportunities || '0'}
               </div>
@@ -599,9 +600,9 @@ const SEODashboard = () => {
                     <td className="px-6 py-4 text-sm text-gray-500">{formatCurrency(kw.cpc)}</td>
                     <td className="px-6 py-4 text-sm">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        kw.intent === 'Commercial' ? 'bg-green-100 text-green-800' :
-                        kw.intent === 'Informational' ? 'bg-blue-100 text-blue-800' :
-                        kw.intent === 'Transactional' ? 'bg-yellow-100 text-yellow-800' :
+                        kw.intent === 'Commercial' ? 'bg-emerald-100 text-emerald-800' :
+                        kw.intent === 'Informational' ? 'bg-[#061ab1] bg-opacity-10 text-[#061ab1]' :
+                        kw.intent === 'Transactional' ? 'bg-amber-100 text-amber-800' :
                         'bg-purple-100 text-purple-800'
                       }`}>
                         {kw.intent}
