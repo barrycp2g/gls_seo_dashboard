@@ -416,7 +416,7 @@ const SEODashboard = () => {
               </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Big Opportunities</h3>
+              <h3 className="text-sm font-medium text-gray-500 mb-2">Opportunities (pos. 2-10)</h3>
               <div className="text-3xl font-bold text-[#061ab1]">
                 {filteredData.domainInfo?.nbBigKwOpportunities || '0'}
               </div>
